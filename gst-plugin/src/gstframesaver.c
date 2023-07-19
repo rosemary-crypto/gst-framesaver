@@ -12,6 +12,7 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideodecoder.h>
 #include <glib.h>
+
 #include <stdio.h>
 
 //#include <FreeImage.h>
@@ -36,6 +37,12 @@ gst_frame_saver_finalize(GObject *object)
 }
 
 static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
+  GstFrameSaver *saver = GST_FRAME_SAVER (parent);
+  gchar *filename;
+  GstMapInfo map;
+  GstClockTime timestamp;
+  saver->frameCount++;
+
   // Get the caps of the buffer
   GstCaps *caps = gst_pad_get_current_caps(pad);
   if (caps == NULL) {
@@ -60,12 +67,27 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
   // Print the retrieved metadata
   g_print("Codec: %s, Width: %d, Height: %d\n", codecName, width, height);
 
+  filename = g_strdup_printf("frame-%05d.png", saver->frameCount);
+  
+  if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+    g_file_set_contents(filename, (gchar *) map.data, map.size, NULL);
+    gst_buffer_unmap(buffer, &map);
+  } else {
+    GST_WARNING_OBJECT(saver, "Failed to map buffer");
+  }
+
+  g_free(filename);
+
+  timestamp = GST_BUFFER_TIMESTAMP(buffer);
+  GST_DEBUG_OBJECT(saver, "Saved frame %d with timestamp %" GST_TIME_FORMAT, saver->frameCount, GST_TIME_ARGS(timestamp));
   // Clean up
   gst_caps_unref(caps);
 
   // Continue processing the buffer
   return GST_FLOW_OK;
+
 }
+
 
 static void
 gst_frame_saver_init (GstFrameSaver * saver)
