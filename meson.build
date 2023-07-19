@@ -17,7 +17,7 @@ gdkpixbuf_dep = dependency('gdk-pixbuf-2.0', version : '>=2.40', required : fals
 gstvideo_dep = dependency('gstreamer-video-1.0', version: '>=1.19', required : true)
 glib_dep = dependency('glib-2.0')
 gobject_dep = dependency('gobject-2.0')
-
+#jpeg_dep = dependency('libjpeg')
 
 
 subdir('gst-plugin')
