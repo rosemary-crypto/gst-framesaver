@@ -12,19 +12,22 @@
 #include <gst/video/gstvideometa.h>
 #include <gst/video/gstvideodecoder.h>
 #include <glib.h>
-
 #include <stdio.h>
 
 //#include <FreeImage.h>
 
 GST_DEBUG_CATEGORY_STATIC (gst_frame_saver_debug);
 #define GST_CAT_DEFAULT gst_frame_saver_debug
-
 #define gst_frame_saver_parent_class parent_class
+#define FORMATS " { AYUV, VUYA, BGRA, ARGB, RGBA, ABGR, Y444, Y42B, YUY2, UYVY, "\
+                "   YVYU, I420, YV12, NV12, NV21, Y41B, RGB, BGR, xRGB, xBGR, "\
+                "   RGBx, BGRx } "
 G_DEFINE_TYPE (GstFrameSaver, gst_frame_saver, GST_TYPE_ELEMENT);
+GST_ELEMENT_REGISTER_DEFINE (framesaver, "framesaver", GST_RANK_PRIMARY, GST_TYPE_FRAME_SAVER);
 
-static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE
-    ("sink", GST_PAD_SINK, GST_PAD_ALWAYS, GST_STATIC_CAPS("video/x-raw"));
+static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink", GST_PAD_SINK, GST_PAD_REQUEST, GST_STATIC_CAPS("video/x-raw"));
+// static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("src", GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS(GST_VIDEO_CAPS_MAKE(FORMATS)))
+
 
 static void 
 gst_frame_saver_finalize(GObject *object)
@@ -37,12 +40,7 @@ gst_frame_saver_finalize(GObject *object)
 }
 
 static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
-  GstFrameSaver *saver = GST_FRAME_SAVER (parent);
-  gchar *filename;
-  GstMapInfo map;
-  GstClockTime timestamp;
-  saver->frameCount++;
-
+  
   // Get the caps of the buffer
   GstCaps *caps = gst_pad_get_current_caps(pad);
   if (caps == NULL) {
@@ -67,35 +65,49 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
   // Print the retrieved metadata
   g_print("Codec: %s, Width: %d, Height: %d\n", codecName, width, height);
 
-  filename = g_strdup_printf("frame-%05d.png", saver->frameCount);
-  
-  if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-    g_file_set_contents(filename, (gchar *) map.data, map.size, NULL);
-    gst_buffer_unmap(buffer, &map);
-  } else {
-    GST_WARNING_OBJECT(saver, "Failed to map buffer");
-  }
-
-  g_free(filename);
-
-  timestamp = GST_BUFFER_TIMESTAMP(buffer);
-  GST_DEBUG_OBJECT(saver, "Saved frame %d with timestamp %" GST_TIME_FORMAT, saver->frameCount, GST_TIME_ARGS(timestamp));
   // Clean up
   gst_caps_unref(caps);
 
   // Continue processing the buffer
   return GST_FLOW_OK;
-
 }
 
+static GstPad * gst_frame_saver_request_new_pad(GstElement *element, GstPadTemplate *templ, const gchar *name, const GstCaps *caps){
+  GstFrameSaver *saver = GST_FRAME_SAVER(element);
+  GstPad *newpad;
+  GstElementClass *kclass;
+
+  saver->pad_count++;
+  gchar *pad_name = g_strdup_printf("sink_%u", server->pad_count);
+  
+  newpad = (GstPad)* GST_ELEMENT_CLASS(parent_class)->request_new_pad(element, templ, pad_name, caps);
+  g_free(pad_name);
+
+  /*
+  - new pad => chain function
+  - new pad => event function
+  - new pad => query function
+  - new pad => flag_proxy_caps
+  - new pad => flag_proxy_allocation
+
+  */
+ gst_pad_set_chain_function(newpad, GST_DEBUB_FUNCPTR(gst_frame_saver_chain));
+ GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_CAPS);
+ GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_ALLOCATION);
+
+ gst_pad_set_active(newpad, TRUE);
+ saver->sinkpad_list = g_list_append(saver->sinkpads, gst_object_ref(newpad));
+ gst_element_add_pad(element, newpad);
+
+ return newpad;
+
+}
 
 static void
 gst_frame_saver_init (GstFrameSaver * saver)
 {
-  saver->sinkpad = gst_pad_new_from_static_template (&sink_template, "sink");
-  gst_pad_set_chain_function (saver->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_frame_saver_chain));
-  gst_element_add_pad (GST_ELEMENT (saver), saver->sinkpad);
+  // saver->srcpad = gst_pad_new_from_static_template (&src_template, "src");
+  // gst_element_add_pad (GST_ELEMENT (saver), saver->srcpad);
 
   saver->frameCount = 0;
 }
