@@ -3,6 +3,7 @@
 
 #include <gst/gst.h>
 
+
 G_BEGIN_DECLS
 
 #define GST_TYPE_FRAME_SAVER (gst_frame_saver_get_type())
@@ -17,6 +18,7 @@ struct _GstFrameSaver
   GstPad        *srcpad;
 
   guint frameCount;
+
 };
 
 struct _GstFrameSaverClass {
