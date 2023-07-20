@@ -1,0 +1,1 @@
+gst-launch-1.0 -v filesrc location=vid1.mp4 ! decodebin ! queue ! framesaver name=saver filesrc location=vid2.mp4 ! decodebin ! queue ! saver.
