@@ -37,7 +37,7 @@ gst_frame_saver_finalize(GObject *object)
 }
 
 static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
-  GstFrameSaver *saver = GST_FRAME_SAVER (parent);
+  GstFrameSaver *saver = GST_FRAME_SAVER(parent);
   gchar *filename;
   GstMapInfo map;
   GstClockTime timestamp;
@@ -58,6 +58,14 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
     return GST_FLOW_ERROR;
   }
 
+  // Make a mutable copy of the structure
+  structure = gst_structure_copy(structure);
+  if (structure == NULL) {
+    g_print("Failed to make a mutable copy of the caps structure\n");
+    gst_caps_unref(caps);
+    return GST_FLOW_ERROR;
+  }
+
   // Retrieve metadata values from the structure
   const gchar *codecName = gst_structure_get_name(structure);
   gint width, height;
@@ -67,10 +75,13 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
   // Print the retrieved metadata
   g_print("Codec: %s, Width: %d, Height: %d\n", codecName, width, height);
 
+  // Set the width and height values in the mutable structure
+  gst_structure_set(structure, "width", G_TYPE_INT, width, "height", G_TYPE_INT, height, NULL);
+
   filename = g_strdup_printf("frame-%05d.png", saver->frameCount);
-  
+
   if (gst_buffer_map(buffer, &map, GST_MAP_READ)) {
-    g_file_set_contents(filename, (gchar *) map.data, map.size, NULL);
+    g_file_set_contents(filename, (gchar *)map.data, map.size, NULL);
     gst_buffer_unmap(buffer, &map);
   } else {
     GST_WARNING_OBJECT(saver, "Failed to map buffer");
@@ -80,13 +91,15 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
 
   timestamp = GST_BUFFER_TIMESTAMP(buffer);
   GST_DEBUG_OBJECT(saver, "Saved frame %d with timestamp %" GST_TIME_FORMAT, saver->frameCount, GST_TIME_ARGS(timestamp));
+
   // Clean up
   gst_caps_unref(caps);
+  gst_structure_free(structure);
 
   // Continue processing the buffer
   return GST_FLOW_OK;
-
 }
+
 
 
 static void
