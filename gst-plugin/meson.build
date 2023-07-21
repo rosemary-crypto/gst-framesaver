@@ -16,10 +16,13 @@ gstaudio_dep = dependency('gstreamer-audio-1.0',
   'src/gstframesaver.c',
   ]
 
+#jpeg_include_dir = jpeg_dep.get_pkgconfig_variable('includedir')
+
 gstframesaverexample = library('gstframesaver',
   gstframesaver_sources,
   c_args: plugin_c_args,
-  dependencies : [gdkpixbuf_dep, gst_dep, gstbase_dep, gstvideo_dep, glib_dep, gobject_dep],#, gstframesaver_dep],
+  #include_directories: jpeg_include_dir,
+  dependencies : [gdkpixbuf_dep, gst_dep, gstbase_dep, gstvideo_dep, glib_dep, gobject_dep, gstapp_dep],
   install : true,
   install_dir : plugins_install_dir,
 )
