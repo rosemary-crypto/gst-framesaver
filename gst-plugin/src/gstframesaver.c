@@ -66,17 +66,11 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
           gint frame_offset = i * frame_size;
           filename = g_strdup_printf("frame-%06d.png", i);
           GstBuffer *frame_buffer = gst_buffer_copy_region(buffer, GST_BUFFER_COPY_ALL, frame_offset, frame_size);
-          if (gst_buffer_map(frame_buffer, &map, GST_MAP_READ)) {
-            g_file_set_contents(filename, (gchar *) map.data, map.size, NULL);
-            gst_buffer_unmap(frame_buffer, &map);
-          } else {
-            GST_WARNING_OBJECT(saver, "Failed to map buffer");
-          }
-
+          const gchar* pad_name = gst_pad_get_name(pad);
+          // Your processing code goes here
+          g_print("Received buffer on pad: %s\n", pad_name);
           ret = gst_pad_push (saver->srcpad, frame_buffer);
-          gst_buffer_unref(frame_buffer);
         }
-        // gst_buffer_remove_range(buffer, 0, frame_size * num_frames);
       }else{
         g_print("Buffer size is smaller than frame size ******\n");
         g_print("frame size %d \n", frame_size);
