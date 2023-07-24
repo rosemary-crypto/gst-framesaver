@@ -1,3 +1,6 @@
 # GSTREAMER frame save repository
 
-Still in progress
+# Building the plugin
+- meson build
+- ninja -C build install
+- framesaver.bat
