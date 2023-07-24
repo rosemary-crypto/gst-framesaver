@@ -1,1 +1,0 @@
-gst-launch-1.0 filesrc location=vid1.mp4 ! decodebin ! framesaver ! fakesink
