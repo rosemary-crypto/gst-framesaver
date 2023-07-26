@@ -1,11 +1,11 @@
-gstframesaver_sources = [
-  'gstframesaver.c',
+gstvideomux_sources = [
+  'gstvideomux.c',
 ]
 
 gstsharedmetadata_dep = dependency('gstsharedmetadata', version: '>=1.0.0', required: true)
 
-gstframesaver = library('gstframesaver',
-  gstframesaver_sources,
+gstvideomux = library('gstvideomux',
+  gstvideomux_sources,
   #include_directories: include_directories('.','../gst-metadata','../'), 
   include_directories: [gst_metadata_inc, configinc, include_directories('.')],
   c_args: plugin_c_args,

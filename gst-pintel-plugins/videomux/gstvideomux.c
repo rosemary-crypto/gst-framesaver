@@ -2,7 +2,7 @@
 #  include <config.h>
 #endif
 
-#include "gstframesaver.h"
+#include "gstvideomux.h"
 #include "gstsharedmetadata.h"
 #include <gst/gstbuffer.h>
 #include <gst/video/video.h>
@@ -17,31 +17,31 @@
 
 //#include <FreeImage.h>
 
-GST_DEBUG_CATEGORY_STATIC (gst_frame_saver_debug);
-#define GST_CAT_DEFAULT gst_frame_saver_debug
+GST_DEBUG_CATEGORY_STATIC (gst_video_mux_debug);
+#define GST_CAT_DEFAULT gst_video_mux_debug
 
-#define gst_frame_saver_parent_class parent_class
+#define gst_video_mux_parent_class parent_class
 #define FORMATS " { AYUV, VUYA, BGRA, ARGB, RGBA, ABGR, Y444, Y42B, YUY2, UYVY, "\
                 "   YVYU, I420, YV12, NV12, NV21, Y41B, RGB, BGR, xRGB, xBGR, "\
                 "   RGBx, BGRx } "
-G_DEFINE_TYPE (GstFrameSaver, gst_frame_saver, GST_TYPE_ELEMENT);
+G_DEFINE_TYPE (GstVideoMux, gst_video_mux, GST_TYPE_ELEMENT);
 
 static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink", GST_PAD_SINK, GST_PAD_REQUEST, GST_STATIC_CAPS_ANY);
 static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("src", GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
 
 static void 
-gst_frame_saver_finalize(GObject *object)
+gst_video_mux_finalize(GObject *object)
 {
-  GstFrameSaver *saver = GST_FRAME_SAVER(object);
+  GstVideoMux *mux = GST_VIDEO_MUX(object);
 
-  GST_DEBUG_OBJECT(saver, "Finalizing");
+  GST_DEBUG_OBJECT(mux, "Finalizing");
 
   G_OBJECT_CLASS(parent_class)->finalize(object);
 }
 
-static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
+static GstFlowReturn gst_video_mux_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
   g_print("\nCHAIN FUNCTION\n");
-  GstFrameSaver *saver = GST_FRAME_SAVER(parent);
+  GstVideoMux *mux = GST_VIDEO_MUX(parent);
   GstFlowReturn ret;
   GstCaps *caps = gst_pad_get_current_caps(pad);
   GstMapInfo map;
@@ -76,7 +76,7 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
       g_print("\n\nHERE\n\n");
       
       g_print("\nBefore pad push");
-      ret = gst_pad_push (saver->srcpad, buffer);
+      ret = gst_pad_push (mux->srcpad, buffer);
       g_print("\nAfter pad push");
       
       gst_caps_unref(caps);
@@ -84,19 +84,19 @@ static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBu
     }
   }
   gst_caps_unref(caps);
-  //ret = gst_pad_push (saver->srcpad, buffer);
+  //ret = gst_pad_push (mux->srcpad, buffer);
   return GST_FLOW_NOT_SUPPORTED;
 }
 
 
-static GstPad * gst_frame_saver_request_new_pad(GstElement *element, GstPadTemplate *templ, const gchar *name, const GstCaps *caps){
+static GstPad * gst_video_mux_request_new_pad(GstElement *element, GstPadTemplate *templ, const gchar *name, const GstCaps *caps){
   
-  GstFrameSaver *saver = GST_FRAME_SAVER(element);
+  GstVideoMux *mux = GST_VIDEO_MUX(element);
   GstPad *newpad;
   GstElementClass *kclass;
 
-  saver->pad_count++;
-  gchar *pad_name = g_strdup_printf("sink_%u", saver->pad_count);
+  mux->pad_count++;
+  gchar *pad_name = g_strdup_printf("sink_%u", mux->pad_count);
   
   // newpad = (GstPad)* GST_ELEMENT_CLASS(parent_class)->request_new_pad(element, templ, pad_name, caps);
   newpad = gst_pad_new_from_template (templ, pad_name);
@@ -110,12 +110,12 @@ static GstPad * gst_frame_saver_request_new_pad(GstElement *element, GstPadTempl
   - new pad => flag_proxy_allocation
 
   */
- gst_pad_set_chain_function(newpad, GST_DEBUG_FUNCPTR (gst_frame_saver_chain));
+ gst_pad_set_chain_function(newpad, GST_DEBUG_FUNCPTR (gst_video_mux_chain));
  GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_CAPS);
  GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_ALLOCATION);
 
  gst_pad_set_active(newpad, TRUE);
- saver->sinkpad_list = g_list_append(saver->sinkpad_list, gst_object_ref(newpad));
+ mux->sinkpad_list = g_list_append(mux->sinkpad_list, gst_object_ref(newpad));
  gst_element_add_pad(element, newpad);
 
  return newpad;
@@ -123,31 +123,31 @@ static GstPad * gst_frame_saver_request_new_pad(GstElement *element, GstPadTempl
 }
 
 static void
-gst_frame_saver_init (GstFrameSaver * saver)
+gst_video_mux_init (GstVideoMux * mux)
 {
   
-  saver->srcpad = gst_pad_new_from_static_template (&src_template, "src");
-  gst_element_add_pad (GST_ELEMENT (saver), saver->srcpad);
+  mux->srcpad = gst_pad_new_from_static_template (&src_template, "src");
+  gst_element_add_pad (GST_ELEMENT (mux), mux->srcpad);
 
-  saver->frameCount = 0;
+  mux->frameCount = 0;
 }
 
 static void
-gst_frame_saver_class_init (GstFrameSaverClass * klass)
+gst_video_mux_class_init (GstVideoMuxClass * klass)
 {
   
   GObjectClass *gobject_class = (GObjectClass *) klass;
   GstElementClass *gstelement_class = (GstElementClass *) klass;
 
-  gobject_class->finalize = gst_frame_saver_finalize;
+  gobject_class->finalize = gst_video_mux_finalize;
   
   gst_element_class_add_static_pad_template (gstelement_class, &sink_template);
   gst_element_class_add_static_pad_template (gstelement_class, &src_template);
   
-  gstelement_class->request_new_pad = GST_DEBUG_FUNCPTR (gst_frame_saver_request_new_pad);
+  gstelement_class->request_new_pad = GST_DEBUG_FUNCPTR (gst_video_mux_request_new_pad);
   
   gst_element_class_set_details_simple (gstelement_class,
-      "FrameSaver",
+      "VideoMux",
       "FIXME:Generic",
       "FIXME:Generic Template Element", "U-DESKTOP-I8GIKDLPINTEL <<user@hostname.org>>");
 
@@ -162,17 +162,17 @@ gst_frame_saver_class_init (GstFrameSaverClass * klass)
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
-  GST_DEBUG_CATEGORY_INIT(gst_frame_saver_debug, "framesaver", 0, "Frame Saver");
+  GST_DEBUG_CATEGORY_INIT(gst_video_mux_debug, "videomux", 0, "Video Mux");
   g_print("\nPlugin REgister");
   // gst_stream_id_meta_api_get_type();
-  return gst_element_register (plugin, "framesaver", GST_RANK_NONE, GST_TYPE_FRAME_SAVER);
+  return gst_element_register (plugin, "videomux", GST_RANK_NONE, GST_TYPE_VIDEO_MUX);
 }
 
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    framesaver,
-    "Frame Saver Plugin",
+    videomux,
+    "Video Mux Plugin",
     plugin_init,
     PACKAGE_VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN
     )
