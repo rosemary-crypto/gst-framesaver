@@ -11,7 +11,7 @@ install_headers(gstsharedmetadata_headers)
 
 gstsharedmetadata = static_library('gstsharedmetadata',
   gstsharedmetadata_sources,
-  include_directories: include_directories('.','../'),
+  include_directories: [configinc],
   c_args: [plugin_c_args,'/Zi'],
   dependencies: [
     gst_dep

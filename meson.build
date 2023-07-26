@@ -9,6 +9,7 @@ gst_version = meson.project_version()
 api_version = '1.0'
 
 plugin_c_args = ['-DHAVE_CONFIG_H']
+configinc = include_directories('.')
 
 cdata = configuration_data()
 cdata.set_quoted('PACKAGE_VERSION', gst_version)
@@ -18,8 +19,6 @@ cdata.set_quoted('GST_API_VERSION', api_version)
 cdata.set_quoted('GST_PACKAGE_NAME', 'GStreamer template Plug-ins')
 cdata.set_quoted('GST_PACKAGE_ORIGIN', 'https://gstreamer.freedesktop.org')
 configure_file(output : 'config.h', configuration : cdata)
-
- # Add this line to include the path to gst-metadata directory
 
 
 gst_dep = dependency('gstreamer-1.0', version : '>=1.19',
@@ -37,7 +36,7 @@ gstapp_dep = dependency('gstreamer-app-1.0',
 gstaudio_dep = dependency('gstreamer-audio-1.0',
     fallback: ['gst-plugins-base', 'audio_dep'])
 
-include_directories('gst-metadata') 
-subdir('gst-metadata')
-include_directories('gst-plugin')
-subdir('gst-plugin')
+gst_metadata_inc = include_directories('gst-metadata') 
+
+subdir('gst-metadata') #first build and install this and comment the other subdirectories. After installing uncomment the rest
+subdir('gst-pintel-plugins')
