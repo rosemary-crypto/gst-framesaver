@@ -2,6 +2,18 @@
     "files.associations": {
         "system_error": "c",
         "xlocale": "c",
-        "jpeglib.h": "c"
-    }
+        "jpeglib.h": "c",
+        "gstframesaver.h": "c",
+        "compare": "c",
+        "memory": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "xmemory": "c",
+        "xstring": "c",
+        "xtr1common": "c",
+        "xutility": "c",
+        "config.h": "c"
+    },
+    "mesonbuild.configureOnOpen": false
 }

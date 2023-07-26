@@ -1,31 +1,36 @@
 #ifdef HAVE_CONFIG_H
-#include <config.h>
+#  include <config.h>
 #endif
 
 #include "gstframesaver.h"
-
+#include "gstsharedmetadata.h"
+#include <gst/gstbuffer.h>
 #include <gst/video/video.h>
 #include <gst/video/gstvideopool.h>
+#include <gst/video/gstvideofilter.h>
+#include <gst/video/gstvideosink.h>
 
-#define VIDEO_WIDTH 640
-#define VIDEO_HEIGHT 480
-#define VIDEO_FPS 30
+#include <gst/video/gstvideometa.h>
+#include <gst/video/gstvideodecoder.h>
+#include <glib.h>
+#include <stdio.h>
 
-GST_DEBUG_CATEGORY_STATIC(gst_frame_saver_debug);
+//#include <FreeImage.h>
+
+GST_DEBUG_CATEGORY_STATIC (gst_frame_saver_debug);
 #define GST_CAT_DEFAULT gst_frame_saver_debug
 
 #define gst_frame_saver_parent_class parent_class
-G_DEFINE_TYPE(GstFrameSaver, gst_frame_saver, GST_TYPE_ELEMENT);
+#define FORMATS " { AYUV, VUYA, BGRA, ARGB, RGBA, ABGR, Y444, Y42B, YUY2, UYVY, "\
+                "   YVYU, I420, YV12, NV12, NV21, Y41B, RGB, BGR, xRGB, xBGR, "\
+                "   RGBx, BGRx } "
+G_DEFINE_TYPE (GstFrameSaver, gst_frame_saver, GST_TYPE_ELEMENT);
 
-static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE(
-    "sink_%u", GST_PAD_SINK, GST_PAD_REQUEST,
-    GST_STATIC_CAPS("video/x-raw, format=RGB, width=" GST_VIDEO_SIZE_RANGE ", height=" GST_VIDEO_SIZE_RANGE ", framerate=" GST_VIDEO_FPS_RANGE)
-);
+static GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE ("sink", GST_PAD_SINK, GST_PAD_REQUEST, GST_STATIC_CAPS_ANY);
+static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("src", GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
 
-static GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE
-    ("src", GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS("video/x-raw"));
-
-static void gst_frame_saver_finalize(GObject *object)
+static void 
+gst_frame_saver_finalize(GObject *object)
 {
   GstFrameSaver *saver = GST_FRAME_SAVER(object);
 
@@ -34,161 +39,119 @@ static void gst_frame_saver_finalize(GObject *object)
   G_OBJECT_CLASS(parent_class)->finalize(object);
 }
 
-static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer)
-{
+static GstFlowReturn gst_frame_saver_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
+  g_print("\nCHAIN FUNCTION\n");
   GstFrameSaver *saver = GST_FRAME_SAVER(parent);
-  saver->frameCount++;
-
-  // Extract video properties from the incoming buffer
-  GstVideoInfo info;
-  gst_video_info_init(&info);
-  gst_video_info_from_caps(&info, gst_pad_get_current_caps(pad));
-
-  gint width = GST_VIDEO_INFO_WIDTH(&info);
-  gint height = GST_VIDEO_INFO_HEIGHT(&info);
-  gint fps_numerator = GST_VIDEO_INFO_FPS_N(&info);
-  gint fps_denominator = GST_VIDEO_INFO_FPS_D(&info);
-
-  // Print the retrieved metadata
-  g_print("Width: %d, Height: %d, FPS: %d/%d\n", width, height, fps_numerator, fps_denominator);
-
-  // Update the capabilities of the source pad
-  GstCaps *src_caps = gst_caps_new_simple("video/x-raw",
-                                          "format", G_TYPE_STRING, "RGB",
-                                          "width", G_TYPE_INT, width,
-                                          "height", G_TYPE_INT, height,
-                                          "framerate", GST_TYPE_FRACTION, fps_numerator, fps_denominator,
-                                          NULL);
-  gst_pad_set_caps(saver->srcpad, src_caps);
-  gst_caps_unref(src_caps);
-
-  // Convert the frame to grayscale (assuming it's in RGB format)
+  GstFlowReturn ret;
+  GstCaps *caps = gst_pad_get_current_caps(pad);
   GstMapInfo map;
-  gst_buffer_map(buffer, &map, GST_MAP_WRITE);
-  guint8 *data = map.data;
-  for (gsize i = 0; i < map.size; i += 3)
-  {
-    guint8 gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
-    data[i] = data[i + 1] = data[i + 2] = gray;
-  }
-  gst_buffer_unmap(buffer, &map);
+  gchar *filename;
 
-  // Continue processing the buffer and push it downstream
-  return gst_pad_push(saver->srcpad, buffer);
-}
+  if (caps) {
+    // Assuming there is only one structure in the caps, we can get its format
+    GstStructure *structure = gst_caps_get_structure(caps, 0);
+    const gchar *format = gst_structure_get_name(structure);
 
-static gboolean gst_frame_saver_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
-{
-  GstFrameSaver *saver = GST_FRAME_SAVER(parent);
+    if (g_strcmp0(format, "video/x-raw") == 0) {
+      gint width, height, stride;
+      gst_structure_get_int(structure, "width", &width);
+      gst_structure_get_int(structure, "height", &height);
+      gst_structure_get_int(structure, "stride", &stride);
 
-  switch (GST_EVENT_TYPE(event))
-  {
-    case GST_EVENT_CAPS:
-    {
-      GstCaps *caps;
-      gst_event_parse_caps(event, &caps);
+      //gint frame_size = height * width; // Assuming no padding
+      //gint buffer_size = gst_buffer_get_size(buffer);
+      
+      //gint frame_offset = 0;
 
-      // Find an available source pad to link
-      guint i;
-      for (i = 0; i < saver->num_input_pads; ++i)
-      {
-        if (!gst_pad_is_linked(saver->input_pads[i]))
-        {
-          GstPad *srcpad = saver->input_pads[i];
+      //GstBuffer *frame_buffer = gst_buffer_copy_region(buffer, GST_BUFFER_COPY_ALL, frame_offset, frame_size);
+      const gchar* pad_name = gst_pad_get_name(pad);
 
-          // Link the new source pad with the sink pad based on the negotiated caps
-          if (gst_pad_link(srcpad, pad) == GST_PAD_LINK_OK)
-          {
-            GST_DEBUG_OBJECT(saver, "Linked new source pad %" GST_PTR_FORMAT " with sink pad", srcpad);
-            break;
-          }
-          else
-          {
-            GST_DEBUG_OBJECT(saver, "Failed to link new source pad with sink pad");
-          }
-        }
-      }
-      break;
+      g_print("Received buffer on pad: %s\n", pad_name);
+      //GstStreamIdMeta *stream_id_meta = (GstStreamIdMeta *)gst_buffer_add_meta(buffer, GST_STREAM_ID_META_GET_INFO, NULL);
+      GstStreamIdMeta *stream_id_meta = (GstStreamIdMeta *)gst_buffer_get_meta(buffer, GST_STREAM_ID_META_API_TYPE);
+      stream_id_meta = gst_buffer_add_stream_id_meta (buffer, 1);
+      if (!stream_id_meta)
+        return GST_FLOW_ERROR;
+      g_print("\nAfter stream_id , id now = %d\n", stream_id_meta->stream_id);
+      g_print("\n\nHERE\n\n");
+      
+      g_print("\nBefore pad push");
+      ret = gst_pad_push (saver->srcpad, buffer);
+      g_print("\nAfter pad push");
+      
+      gst_caps_unref(caps);
+      return ret;
     }
-    default:
-      break;
   }
-
-  return gst_pad_event_default(pad, parent, event);
+  gst_caps_unref(caps);
+  //ret = gst_pad_push (saver->srcpad, buffer);
+  return GST_FLOW_NOT_SUPPORTED;
 }
 
-static void gst_frame_saver_init(GstFrameSaver *saver)
-{
-  saver->sinkpad = gst_pad_new_from_static_template(&sink_template, "sink");
-  gst_pad_set_chain_function(saver->sinkpad, GST_DEBUG_FUNCPTR(gst_frame_saver_chain));
-  gst_pad_set_event_function(saver->sinkpad, GST_DEBUG_FUNCPTR(gst_frame_saver_sink_event));
-  gst_element_add_pad(GST_ELEMENT(saver), saver->sinkpad);
-  saver->srcpad = gst_pad_new_from_static_template(&src_template, "src");
-  gst_element_add_pad(GST_ELEMENT(saver), saver->srcpad);
-  saver->frameCount = 0;
-  saver->num_input_pads = 0;
-  for (guint i = 0; i < MAX_INPUT_PADS; ++i)
-  {
-    saver->input_pads[i] = NULL;
-  }
-}
 
-static GstPad *gst_frame_saver_request_new_pad(GstElement *element, GstPadTemplate *templ,
-                                               const gchar *name, const GstCaps *caps)
-{
+static GstPad * gst_frame_saver_request_new_pad(GstElement *element, GstPadTemplate *templ, const gchar *name, const GstCaps *caps){
+  
   GstFrameSaver *saver = GST_FRAME_SAVER(element);
+  GstPad *newpad;
+  GstElementClass *kclass;
 
-  GST_DEBUG_OBJECT(saver, "Requesting new pad: %s", name);
+  saver->pad_count++;
+  gchar *pad_name = g_strdup_printf("sink_%u", saver->pad_count);
+  
+  // newpad = (GstPad)* GST_ELEMENT_CLASS(parent_class)->request_new_pad(element, templ, pad_name, caps);
+  newpad = gst_pad_new_from_template (templ, pad_name);
+  g_free(pad_name);
 
-  if (g_str_has_prefix(name, "sink_"))
-  {
-    // Check if we can create more input pads
-    if (saver->num_input_pads >= MAX_INPUT_PADS)
-    {
-      GST_DEBUG_OBJECT(saver, "Maximum number of input pads reached");
-      return NULL;
-    }
+  /*
+  - new pad => chain function
+  - new pad => event function
+  - new pad => query function
+  - new pad => flag_proxy_caps
+  - new pad => flag_proxy_allocation
 
-    // Create and add the new input pad
-    gchar *srcpad_name = g_strdup_printf("src_%u", saver->num_input_pads);
-    GstPad *srcpad = gst_pad_new_from_static_template(&src_template, srcpad_name);
-    g_free(srcpad_name);
+  */
+ gst_pad_set_chain_function(newpad, GST_DEBUG_FUNCPTR (gst_frame_saver_chain));
+ GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_CAPS);
+ GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_ALLOCATION);
 
-    gst_element_add_pad(GST_ELEMENT(saver), srcpad);
-    saver->input_pads[saver->num_input_pads++] = srcpad;
+ gst_pad_set_active(newpad, TRUE);
+ saver->sinkpad_list = g_list_append(saver->sinkpad_list, gst_object_ref(newpad));
+ gst_element_add_pad(element, newpad);
 
-    return srcpad;
-  }
+ return newpad;
 
-  // Handle requests for other types of pads (if any)
-  return GST_ELEMENT_CLASS(parent_class)->request_new_pad(element, templ, name, caps);
 }
 
-static void gst_frame_saver_class_init(GstFrameSaverClass *klass)
+static void
+gst_frame_saver_init (GstFrameSaver * saver)
 {
-  GObjectClass *gobject_class;
-  GstElementClass *gstelement_class;
+  
+  saver->srcpad = gst_pad_new_from_static_template (&src_template, "src");
+  gst_element_add_pad (GST_ELEMENT (saver), saver->srcpad);
 
-  gobject_class = G_OBJECT_CLASS(klass);
-  gstelement_class = GST_ELEMENT_CLASS(klass);
+  saver->frameCount = 0;
+}
+
+static void
+gst_frame_saver_class_init (GstFrameSaverClass * klass)
+{
+  
+  GObjectClass *gobject_class = (GObjectClass *) klass;
+  GstElementClass *gstelement_class = (GstElementClass *) klass;
 
   gobject_class->finalize = gst_frame_saver_finalize;
+  
+  gst_element_class_add_static_pad_template (gstelement_class, &sink_template);
+  gst_element_class_add_static_pad_template (gstelement_class, &src_template);
+  
+  gstelement_class->request_new_pad = GST_DEBUG_FUNCPTR (gst_frame_saver_request_new_pad);
+  
+  gst_element_class_set_details_simple (gstelement_class,
+      "FrameSaver",
+      "FIXME:Generic",
+      "FIXME:Generic Template Element", "U-DESKTOP-I8GIKDLPINTEL <<user@hostname.org>>");
 
-  // Set the pad templates to allow video input and output
-  gst_element_class_add_pad_template(gstelement_class,
-                                     gst_static_pad_template_get(&sink_template));
-  gst_element_class_add_pad_template(gstelement_class,
-                                     gst_static_pad_template_get(&src_template));
-
-  gst_element_class_set_details_simple(gstelement_class,
-                                       "FrameSaver",
-                                       "FIXME:Generic",
-                                       "FIXME:Generic Template Element", "U-DESKTOP-I8GIKDLPINTEL <<user@hostname.org>>");
-
-  // Override the request_new_pad function to handle multiple input pads
-  GST_ELEMENT_CLASS(klass)->request_new_pad = GST_DEBUG_FUNCPTR(gst_frame_saver_request_new_pad);
 }
-
 
 
 
@@ -196,15 +159,20 @@ static void gst_frame_saver_class_init(GstFrameSaverClass *klass)
  * initialize the plug-in itself
  * register the element factories and other features
  */
-static gboolean plugin_init(GstPlugin *plugin)
+static gboolean
+plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT(gst_frame_saver_debug, "framesaver", 0, "Frame Saver");
-  return gst_element_register(plugin, "framesaver", GST_RANK_NONE, GST_TYPE_FRAME_SAVER);
+  g_print("\nPlugin REgister");
+  // gst_stream_id_meta_api_get_type();
+  return gst_element_register (plugin, "framesaver", GST_RANK_NONE, GST_TYPE_FRAME_SAVER);
 }
 
-GST_PLUGIN_DEFINE(GST_VERSION_MAJOR,
-                  GST_VERSION_MINOR,
-                  framesaver,
-                  "Frame Saver Plugin",
-                  plugin_init,
-                  PACKAGE_VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN)
+
+GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
+    GST_VERSION_MINOR,
+    framesaver,
+    "Frame Saver Plugin",
+    plugin_init,
+    PACKAGE_VERSION, GST_LICENSE, GST_PACKAGE_NAME, GST_PACKAGE_ORIGIN
+    )
