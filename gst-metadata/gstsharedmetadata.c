@@ -44,21 +44,8 @@ gst_stream_id_meta_init (GstMeta * meta, gpointer params, GstBuffer * buffer)
 gboolean
 gst_stream_id_meta_transform (GstBuffer *transbuf, GstMeta *meta, GstBuffer *buffer, GQuark type, gpointer data) 
 {
-                        // GstStreamIdMeta* src_meta = (GstStreamIdMeta *)meta;
-                        // GstStreamIdMeta* dest_meta = NULL;
-                        // // Check if the destination buffer already has the metadata attached
-                        // dest_meta = (GstStreamIdMeta *)gst_buffer_get_meta(transbuf, GST_STREAM_ID_META_GET_INFO);
-
-                        // // If metadata already exists in the destination buffer, free it before adding new metadata
-                        // if (dest_meta) {
-                        //     gst_buffer_remove_meta(transbuf, (GstMeta *)dest_meta);
-                        // }
-
-                        // // Add the new metadata to the destination buffer
-                        // dest_meta = gst_buffer_add_stream_id_meta(transbuf, src_meta->stream_id);
     GstStreamIdMeta * smeta = (GstStreamIdMeta *) meta;
     GstStreamIdMeta * dmeta = (GstStreamIdMeta *)gst_buffer_get_meta(transbuf, GST_STREAM_ID_META_API_TYPE);
-    //dmeta = (GstStreamIdMeta *)gst_buffer_get_meta(transbuf, GST_STREAM_ID_META_GET_INFO);
     if(dmeta){
         dmeta->stream_id = smeta->stream_id;
     }

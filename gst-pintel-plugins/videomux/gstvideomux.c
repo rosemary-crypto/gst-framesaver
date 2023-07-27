@@ -67,15 +67,37 @@ static GstFlowReturn gst_video_mux_chain(GstPad *pad, GstObject *parent, GstBuff
       const gchar* pad_name = gst_pad_get_name(pad);
 
       g_print("Received buffer on pad: %s\n", pad_name);
-      //GstStreamIdMeta *stream_id_meta = (GstStreamIdMeta *)gst_buffer_add_meta(buffer, GST_STREAM_ID_META_GET_INFO, NULL);
+
+      // Print the custom metadata (stream_id) from the buffer before adding it
       GstStreamIdMeta *stream_id_meta = (GstStreamIdMeta *)gst_buffer_get_meta(buffer, GST_STREAM_ID_META_API_TYPE);
-      stream_id_meta = gst_buffer_add_stream_id_meta (buffer, 1);
-      if (!stream_id_meta)
+      if (stream_id_meta) {
+        g_print("Stream ID before adding metadata: %d\n", stream_id_meta->stream_id);
+      } else {
+        g_print("Custom metadata (stream_id) not found in the buffer.\n");
+      }
+
+      // Add the custom metadata (stream_id) to the buffer
+      stream_id_meta = gst_buffer_add_stream_id_meta(buffer, 1);
+      if (!stream_id_meta) {
+        g_print("Failed to add custom metadata to the buffer.\n");
         return GST_FLOW_ERROR;
+      }
+
       g_print("\nAfter stream_id , id now = %d\n", stream_id_meta->stream_id);
       g_print("\n\nHERE\n\n");
+      // Print the custom metadata (stream_id) from the buffer after adding it
+      g_print("Stream ID after adding metadata: %d\n", stream_id_meta->stream_id);
+
       
       g_print("\nBefore pad push");
+      GstStreamIdMeta *stream_id_meta2 = (GstStreamIdMeta *)gst_buffer_get_meta(buffer, GST_STREAM_ID_META_API_TYPE);
+      if (stream_id_meta2) {
+        g_print("*******AFTER Stream ID before adding metadata: %d\n", stream_id_meta2->stream_id);
+      } else {
+        g_print("**********AFTER Custom metadata (stream_id) not found in the buffer.\n");
+      }
+
+
       ret = gst_pad_push (mux->srcpad, buffer);
       g_print("\nAfter pad push");
       
@@ -84,7 +106,6 @@ static GstFlowReturn gst_video_mux_chain(GstPad *pad, GstObject *parent, GstBuff
     }
   }
   gst_caps_unref(caps);
-  //ret = gst_pad_push (mux->srcpad, buffer);
   return GST_FLOW_NOT_SUPPORTED;
 }
 
@@ -102,14 +123,6 @@ static GstPad * gst_video_mux_request_new_pad(GstElement *element, GstPadTemplat
   newpad = gst_pad_new_from_template (templ, pad_name);
   g_free(pad_name);
 
-  /*
-  - new pad => chain function
-  - new pad => event function
-  - new pad => query function
-  - new pad => flag_proxy_caps
-  - new pad => flag_proxy_allocation
-
-  */
  gst_pad_set_chain_function(newpad, GST_DEBUG_FUNCPTR (gst_video_mux_chain));
  GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_CAPS);
  GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_ALLOCATION);
@@ -164,7 +177,6 @@ plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT(gst_video_mux_debug, "videomux", 0, "Video Mux");
   g_print("\nPlugin REgister");
-  // gst_stream_id_meta_api_get_type();
   return gst_element_register (plugin, "videomux", GST_RANK_NONE, GST_TYPE_VIDEO_MUX);
 }
 

@@ -1,0 +1,8 @@
+libdir=C:/lib/gstreamer-1.0
+includedir=C:/include
+
+Name: gstsharedmetadata
+Description: GStreamer Shared Metadata Library
+Version: 1.0.0
+Libs: -L${libdir} -lgstsharedmetadata
+Cflags: -I${includedir}

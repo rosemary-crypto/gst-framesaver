@@ -18,5 +18,4 @@ gstsharedmetadata = static_library('gstsharedmetadata',
   ],
   install: true,
   install_dir : plugins_install_dir,
-  #link_with: gstsharedmetadata_lib
 )
