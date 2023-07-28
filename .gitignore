@@ -6,5 +6,6 @@
 
 #Ignore some files
 *.mp4
+*.avi
 *_ignore.c
 *_ignore.h
