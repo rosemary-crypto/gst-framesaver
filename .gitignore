@@ -1,0 +1,10 @@
+*.exe
+
+# Ignore Directories
+/build/
+/.vscode/
+
+#Ignore some files
+*.mp4
+*_ignore.c
+*_ignore.h

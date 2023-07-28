@@ -13,7 +13,9 @@
         "xstring": "c",
         "xtr1common": "c",
         "xutility": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "gstsharedmetadata.h": "c",
+        "xlocnum": "c"
     },
     "mesonbuild.configureOnOpen": false
 }

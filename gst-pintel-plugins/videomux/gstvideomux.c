@@ -40,7 +40,6 @@ gst_video_mux_finalize(GObject *object)
 }
 
 static GstFlowReturn gst_video_mux_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer) {
-  g_print("\nCHAIN FUNCTION\n");
   GstVideoMux *mux = GST_VIDEO_MUX(parent);
   GstFlowReturn ret;
   GstCaps *caps = gst_pad_get_current_caps(pad);
@@ -58,49 +57,25 @@ static GstFlowReturn gst_video_mux_chain(GstPad *pad, GstObject *parent, GstBuff
       gst_structure_get_int(structure, "height", &height);
       gst_structure_get_int(structure, "stride", &stride);
 
-      //gint frame_size = height * width; // Assuming no padding
-      //gint buffer_size = gst_buffer_get_size(buffer);
-      
-      //gint frame_offset = 0;
+      gchar* pad_name = gst_pad_get_name(pad);
+      g_print("VideoMux: Received buffer on pad: %s\n", pad_name);
 
-      //GstBuffer *frame_buffer = gst_buffer_copy_region(buffer, GST_BUFFER_COPY_ALL, frame_offset, frame_size);
-      const gchar* pad_name = gst_pad_get_name(pad);
-
-      g_print("Received buffer on pad: %s\n", pad_name);
-
-      // Print the custom metadata (stream_id) from the buffer before adding it
-      GstStreamIdMeta *stream_id_meta = (GstStreamIdMeta *)gst_buffer_get_meta(buffer, GST_STREAM_ID_META_API_TYPE);
+      GstStreamIdMeta *stream_id_meta;
+      stream_id_meta = gst_buffer_get_stream_id_meta(buffer);
       if (stream_id_meta) {
-        g_print("Stream ID before adding metadata: %d\n", stream_id_meta->stream_id);
-      } else {
-        g_print("Custom metadata (stream_id) not found in the buffer.\n");
+        g_print("VideoMux: Stream ID before adding metadata: %s\n", stream_id_meta->stream_id);
       }
-
       // Add the custom metadata (stream_id) to the buffer
-      stream_id_meta = gst_buffer_add_stream_id_meta(buffer, 1);
+      stream_id_meta = gst_buffer_add_stream_id_meta(buffer, pad_name);
       if (!stream_id_meta) {
-        g_print("Failed to add custom metadata to the buffer.\n");
+        g_print("VideoMux: Failed to add custom metadata to the buffer.\n");
         return GST_FLOW_ERROR;
       }
-
-      g_print("\nAfter stream_id , id now = %d\n", stream_id_meta->stream_id);
-      g_print("\n\nHERE\n\n");
-      // Print the custom metadata (stream_id) from the buffer after adding it
-      g_print("Stream ID after adding metadata: %d\n", stream_id_meta->stream_id);
-
-      
-      g_print("\nBefore pad push");
-      GstStreamIdMeta *stream_id_meta2 = (GstStreamIdMeta *)gst_buffer_get_meta(buffer, GST_STREAM_ID_META_API_TYPE);
-      if (stream_id_meta2) {
-        g_print("*******AFTER Stream ID before adding metadata: %d\n", stream_id_meta2->stream_id);
-      } else {
-        g_print("**********AFTER Custom metadata (stream_id) not found in the buffer.\n");
+      else {
+        g_print("VideoMux: Stream ID after adding metadata: %s\n", stream_id_meta->stream_id);
       }
-
-
       ret = gst_pad_push (mux->srcpad, buffer);
-      g_print("\nAfter pad push");
-      
+    
       gst_caps_unref(caps);
       return ret;
     }
@@ -118,20 +93,20 @@ static GstPad * gst_video_mux_request_new_pad(GstElement *element, GstPadTemplat
 
   mux->pad_count++;
   gchar *pad_name = g_strdup_printf("sink_%u", mux->pad_count);
-  
+    
   // newpad = (GstPad)* GST_ELEMENT_CLASS(parent_class)->request_new_pad(element, templ, pad_name, caps);
   newpad = gst_pad_new_from_template (templ, pad_name);
   g_free(pad_name);
 
- gst_pad_set_chain_function(newpad, GST_DEBUG_FUNCPTR (gst_video_mux_chain));
- GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_CAPS);
- GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_ALLOCATION);
+  gst_pad_set_chain_function(newpad, GST_DEBUG_FUNCPTR (gst_video_mux_chain));
+  GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_CAPS);
+  GST_OBJECT_FLAG_SET(newpad, GST_PAD_FLAG_PROXY_ALLOCATION);
 
- gst_pad_set_active(newpad, TRUE);
- mux->sinkpad_list = g_list_append(mux->sinkpad_list, gst_object_ref(newpad));
- gst_element_add_pad(element, newpad);
+  gst_pad_set_active(newpad, TRUE);
+  mux->sinkpad_list = g_list_append(mux->sinkpad_list, gst_object_ref(newpad));
+  gst_element_add_pad(element, newpad);
 
- return newpad;
+  return newpad;
 
 }
 
@@ -176,7 +151,7 @@ static gboolean
 plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT(gst_video_mux_debug, "videomux", 0, "Video Mux");
-  g_print("\nPlugin REgister");
+  g_print("VideoMux: Plugin REgister\n");
   return gst_element_register (plugin, "videomux", GST_RANK_NONE, GST_TYPE_VIDEO_MUX);
 }
 
